@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class LineBotController extends Controller
 {
@@ -10,5 +11,11 @@ class LineBotController extends Controller
     {
         return view('linebot.index');
         // resources/views/linebotフォルダのindexというviewを表示しろ
+    }
+
+    public function parrot(Request $request)
+    {
+        Log::debug($request->header());
+        Log::debug($request->input());
     }
 }
