@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Gurunavi;
+use App\Services\RestaurantBubbleBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -9,6 +11,9 @@ use Illuminate\Support\Facades\Log;
 use LINE\LINEBot;
 use LINE\LINEBot\Event\MessageEvent\TextMessage;
 use LINE\LINEBot\HTTPClient\CurlHTTPClient;
+
+use LINE\LINEBot\MessageBuilder\FlexMessageBuilder;
+use LINE\LINEBot\MessageBuilder\Flex\ContainerBuilder\CarouselContainerBuilder;
 
 class LineBotController extends Controller
 {
@@ -18,7 +23,7 @@ class LineBotController extends Controller
         // resources/views/linebotフォルダのindexというviewを表示しろ
     }
 
-    public function parrot(Request $request)
+    public function restaurants(Request $request)
     {
         Log::debug($request->header());
         Log::debug($request->input());
@@ -41,10 +46,40 @@ class LineBotController extends Controller
                 Log::debug('Non text message has come');
                 continue;
             }
+            $gurunavi = new Gurunavi();
+            $gurunaviResponse = $gurunavi->searchRestaurants($event->getText());
 
-            $replyToken = $event->getReplyToken();
-            $replyText = $event->getText();
-            $lineBot->replyText($replyToken, $replyText);
+            if (array_key_exists('error', $gurunaviResponse)) {
+                $replyText = $gurunaviResponse['error'][0]['message'];
+                $replyToken = $event->getReplyToken();
+                $lineBot->replyText($replyToken, $replyText);
+                continue;
+            }
+            
+            // continueはしたに続くのではなくそこで処理が終わって、次の繰り返しに移る(foreach)
+            // if の処理がfalseの場合、41,42は読まれずに下の処理に入る
+
+            
+            // $replyText = $event->getText();
+            $bubbles = [];
+            foreach ($gurunaviResponse['rest'] as $restaurant) {
+                $bubble = RestaurantBubbleBuilder::builder();
+                $bubble->setContents($restaurant);
+                $bubbles[] = $bubble;
+            }
+
+            $carousel = CarouselContainerBuilder::builder();
+            $carousel->setContents($bubbles);
+
+            $flex = FlexMessageBuilder::builder();
+            $flex->setAltText('飲食店検索結果');
+            $flex->setContents($carousel);
+
+            $lineBot->replyMessage($event->getReplyToken(), $flex);
         }
     }
 }
+
+
+// チーム開発で誰かが既にライブラリを引き寄せてたらcomposer installで良い
+// 自分で作るときはrequire
